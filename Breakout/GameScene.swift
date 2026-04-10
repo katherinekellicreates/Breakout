@@ -12,6 +12,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     var ball = SKShapeNode()
     var paddle = SKSpriteNode()
     var bricks = [SKSpriteNode]()
+    var brickLevels: [SKSpriteNode: Int] = [:]
     var loseZone = SKSpriteNode()
     var playLabel = SKLabelNode()
     var livesLabel = SKLabelNode()
@@ -63,13 +64,13 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             starsBackground.run(moveForever)
         }
     }
-    
+    //heart.circle.fill
     func makeBall() {
         ball.removeFromParent() // remove the ball (if it exists)
         ball = SKShapeNode(circleOfRadius: 10)
         ball.position = CGPoint(x: frame.midX, y: frame.midY)
         ball.strokeColor = .black
-        ball.fillColor = .yellow
+        ball.fillColor = .white
         ball.name = "ball"
         
         // physics shape matches ball image
@@ -108,6 +109,10 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         brick.physicsBody?.isDynamic = false
         addChild(brick)
         bricks.append(brick)
+        
+        if color == .myPink { brickLevels[brick] = 1 }
+        else if color == .myLightPink { brickLevels[brick] = 2 }
+        else { brickLevels[brick] = 3 }
     }
     
     func makeBricks() {
@@ -123,7 +128,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         //now, figure the number and spacing of each row of bricks
         let count = Int(frame.width) / 55 //bricks per row
         let xOffset = (Int(frame.width) - (count * 55)) / 2 + Int(frame.minX) + 25
-        let colors: [UIColor] = [.blue, .orange, .green]
+        let colors: [UIColor] = [.myPink, .myLightPink, .myLighterPink]
         for r in 0..<3 {
             let y = Int(frame.maxY) - 65 - (r * 25)
             for i in 0..<count {
@@ -134,7 +139,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     }
     
     func makeLoseZone() {
-        loseZone = SKSpriteNode(color: .red, size: CGSize(width: frame.width, height: 50))
+        loseZone = SKSpriteNode(color: .myPink, size: CGSize(width: frame.width, height: 50))
         loseZone.position = CGPoint(x: frame.midX, y: frame.minY + 25)
         loseZone.name = "loseZone"
         loseZone.physicsBody = SKPhysicsBody(rectangleOf: loseZone.size)
@@ -144,20 +149,20 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     func makeLabels() {
         playLabel.fontSize = 24
         playLabel.text = "Tap to start"
-        playLabel.fontName = "Arial"
+        playLabel.fontName = "Georgia"
         playLabel.position = CGPoint(x: frame.midX, y: frame.midY - 50)
         playLabel.name = "playLabel"
         addChild(playLabel)
         
         livesLabel.fontSize = 18
         livesLabel.fontColor = .black
-        livesLabel.fontName = "Arial"
+        livesLabel.fontName = "Georgia"
         livesLabel.position = CGPoint(x: frame.minX + 50, y: frame.minY + 18)
         addChild(livesLabel)
         
         scoreLabel.fontSize = 18
         scoreLabel.fontColor = .black
-        scoreLabel.fontName = "Arial"
+        scoreLabel.fontName = "Georgia"
         scoreLabel.position = CGPoint(x: frame.maxX - 50, y: frame.minY + 18)
         addChild(scoreLabel)
     }
@@ -200,14 +205,19 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
                 ball.physicsBody!.velocity.dx += CGFloat(1.02)
                 ball.physicsBody!.velocity.dy += CGFloat(1.02)
                 updateLabels()
-                if brick.color == .blue {
-                    brick.color = .orange //blue brick turns orange
-                }
-                else if brick.color == .orange {
-                    brick.color = .green // orange bricks turn green
-                }
-                else { //must be a green brick, which get removed
+                
+                let level = brickLevels[brick] ?? 3
+                switch level {
+                case 1:
+                    brick.color = .myLightPink
+                    brickLevels[brick] = 2
+                case 2:
+                    brick.color = .myLighterPink
+                    brickLevels[brick] = 3
+                default:
                     brick.removeFromParent()
+                    brickLevels.removeValue(forKey: brick)
+                    removedBricks += 1
                     if removedBricks == bricks.count {
                         gameOver(winner: true)
                     }
@@ -216,38 +226,36 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
         if  contact.bodyA.node?.name == "loseZone" ||
                 contact.bodyB.node?.name == "loseZone" {
-            lives -= 1
-            if lives > 0 {
-                score = 0
-                resetGame()
-                kickBall()
-            }
-            else {
-                gameOver(winner: false)
+                lives -= 1
+                if lives > 0 {
+                    score = 0
+                    resetGame()
+                    kickBall()
+                } else {
+                    gameOver(winner: false)
+                }
             }
         }
-    }
+    
     func gameOver(winner: Bool) {
         playingGame = false
         playLabel.alpha = 1
         resetGame()
         if winner {
-            playLabel.text = "You win! Tap to play again"
-        }
-        else {
-            playLabel.text = "You lose! Tap to play again"
+            playLabel.text = winner ? "You win! Tap to play again" : "You lose! Tap to play again"
         }
     }
-    override func update(_ currentTime: TimeInterval) {
-        if abs(ball.physicsBody!.velocity.dx) < 100 {
-            //ball has stalled in x direction, so kick it randomly horizontally
-            ball.physicsBody?.applyImpulse(CGVector(dx: Int.random(in: -3...3), dy: 0))
+            override func update(_ currentTime: TimeInterval) {
+                guard let ballBody = ball.physicsBody else { return }
+                
+                if abs(ballBody.velocity.dx) < 100 {
+                    let dx = CGFloat.random(in: -3...3)
+                    ballBody.applyImpulse(CGVector(dx: dx, dy: 0))
+                }
+                if abs(ballBody.velocity.dy) < 100 {
+                    let dy = CGFloat.random(in: -3...3)
+                    ballBody.applyImpulse(CGVector(dx: 0, dy: dy))
+                }
+            }
         }
-        if abs(ball.physicsBody!.velocity.dy) < 100 {
-            //ball has stalled in y direct, so kick it randomly vertically
-            ball.physicsBody?.applyImpulse(CGVector(dx: 0, dy: Int.random(in: -3...3)))
-        }
-    }
-}
-
 
